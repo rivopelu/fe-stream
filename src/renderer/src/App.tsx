@@ -1,19 +1,15 @@
-import { useEffect } from 'react'
+import { LeftBar } from './components/LeftBar'
 import { MediaCapture } from './components/MediaCapture'
-import axios from 'axios'
+import { RightBar } from './components/RightBar'
 
 function App(): JSX.Element {
-  const ipcHandle = (): void => window.electron.ipcRenderer.send('ping')
-
-  useEffect(() => {
-    axios.get('http://localhost:9987').then((res) => console.log(res))
-  }, [])
-
   return (
-    <div>
-      <button onClick={ipcHandle}>onCLICK</button>
-      <MediaCapture />
-      {/* <div>{data}</div> */}
+    <div className="flex">
+      <LeftBar />
+      <div className="flex-1 min-h-screen flex items-center justify-center flex-col">
+        <MediaCapture />
+      </div>
+      <RightBar />
     </div>
   )
 }
