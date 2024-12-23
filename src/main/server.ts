@@ -26,7 +26,7 @@ function startStreaming() {
   if (isStreaming) return
   isStreaming = true
   ffmpeg(videoStream)
-    .inputFormat('webm') // Match frontend mimeType
+    .inputFormat('webm')
     .videoCodec('libx264')
     .audioCodec('aac')
     .outputOptions([
