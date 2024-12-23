@@ -1,84 +1,138 @@
-import { useRef, useState } from 'react'
+import { useRef, useState } from 'react';
 
 export function MediaCapture() {
-  const [errorMessage] = useState<string>('')
-  const [isCameraActive, setIsCameraActive] = useState<boolean>(false)
-  const videoRef = useRef<any>(null)
-  const mediaRecorderRef = useRef<any>(null)
-  const chunks = useRef<any>([])
+	const [errorMessage, setErrorMessage] = useState<string>('');
+	const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
+	const videoRef = useRef<HTMLVideoElement>(null);
+	const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
-  const ipcLiveTest = (): void => window.electron.ipcRenderer.send('ping')
+	/**
+	 * 📡 Start Live Stream
+	 */
+	const startLiveStream = async () => {
+		try {
+			// 1. Access Screen and Audio
+			const stream = await navigator.mediaDevices.getDisplayMedia({
+				video: { width: 1920, height: 1080, frameRate: 30 },
+				audio: true,
+			});
+			// const stream = await navigator.mediaDevices.getDisplayMedia({
+			// 	video: {
+			// 		width: { ideal: 1920 },
+			// 		height: { ideal: 1080 },
+			// 		frameRate: { ideal: 30 },
+			// 	},
+			// 	audio: true,
+			// });
 
-  const startLiveStream = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          width: { ideal: 1080 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 }
-        }
-      })
+			// 2. Display Stream in Video Element
+			if (videoRef.current) {
+				videoRef.current.srcObject = stream;
+			}
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-      }
+			// 3. Initialize MediaRecorder
+			const mediaRecorder = new MediaRecorder(stream, {
+				mimeType: 'video/webm; codecs=vp8'  // VP8 codec for WebM format
+				// mimeType: 'video/mp4; codecs=avc1.42E01E'  // H.264 codec for MP4 format
+			});
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm; codecs=vp8'
-      })
+			// 4. Store MediaRecorder in Ref
+			mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0) {
-          const blob = event.data
-          // const buffer = await blob.arrayBuffer()
-          // console.log(buffer)
-          sendToServer(blob)
-        }
-      }
+			// 5. Handle Data Available Event
+			mediaRecorder.ondataavailable = async (event) => {
+				if (event.data.size > 0) {
+					try {
+						const blob = event.data;
+						console.log('Chunk Blob size:', blob.size);
+						await sendToServer(blob); // Send chunk to the server
+					} catch (err) {
+						console.error('Failed to send chunk:', err);
+						setErrorMessage('Failed to send data to server.');
+					}
+				}
+			};
 
-      mediaRecorder.start(1000) // Kirim setiap detik
+			// 6. Handle Errors
+			mediaRecorder.onerror = (event) => {
+				console.error('MediaRecorder error:', event.error);
+				setErrorMessage('MediaRecorder encountered an error.');
+			};
 
-      setIsCameraActive(true)
-    } catch (error) {
-      console.error('Error starting live stream:', error)
-    }
-  }
+			// 7. Start Recording
+			mediaRecorder.start(1000); // Record in 1-second chunks
+			setIsCameraActive(true);
 
-  const sendToServer = async (chunk) => {
-    const formData = new FormData()
-    formData.append('video', chunk)
+			console.log('MediaRecorder started');
+		} catch (error) {
+			console.error('Error starting live stream:', error);
+			setErrorMessage('Failed to start live stream. Please check permissions.');
+		}
+	};
 
-    try {
-      await fetch('http://localhost:3000/test', {
-        method: 'POST',
-        body: formData
-      })
-    } catch (error) {
-      console.error('Error sending video chunk:', error)
-    }
-  }
+	/**
+	 * 📤 Send Chunks to Server
+	 */
+	const sendToServer = async (blob: Blob) => {
+		try {
+			const formData = new FormData();
+			formData.append('video', blob, 'chunk.webm');
 
-  const stopCamera = () => {
-    const stream = videoRef.current?.srcObject
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop())
-    }
+			const response = await fetch('http://localhost:3000/upload', {
+				method: 'POST',
+				body: formData,
+			});
 
-    setIsCameraActive(false)
-  }
+			if (!response.ok) {
+				throw new Error(`Server responded with status: ${response.status}`);
+			}
 
-  return (
-    <div>
-      <h1>Media Capture</h1>
-      {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
-      <video ref={videoRef} autoPlay muted style={{ width: '600px', border: '1px solid black' }} />
-      <div>
-        {isCameraActive ? (
-          <button onClick={stopCamera}>Stop Camera</button>
-        ) : (
-          <button onClick={startLiveStream}>Start Camera</button>
-        )}
-      </div>
-    </div>
-  )
+			console.log('Chunk sent successfully');
+		} catch (error) {
+			console.error('Error sending chunk to server:', error);
+			setErrorMessage('Failed to send data to server.');
+		}
+	};
+
+	/**
+	 * 🛑 Stop Live Stream
+	 */
+	const stopCamera = () => {
+		try {
+			if (mediaRecorderRef.current) {
+				mediaRecorderRef.current.stop();
+				console.log('MediaRecorder stopped');
+			}
+
+			const stream = videoRef.current?.srcObject as MediaStream;
+			if (stream) {
+				stream.getTracks().forEach((track) => track.stop());
+			}
+
+			setIsCameraActive(false);
+		} catch (error) {
+			console.error('Error stopping live stream:', error);
+			setErrorMessage('Failed to stop the live stream.');
+		}
+	};
+
+	return (
+		<div>
+			<h1>🎥 Media Capture</h1>
+			{errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
+			<video
+				ref={videoRef}
+				autoPlay
+				muted
+				style={{ width: '600px', border: '1px solid black' }}
+			/>
+			<div>
+				{isCameraActive ? (
+					<button onClick={stopCamera}>🛑 Stop Stream</button>
+				) : (
+					<button onClick={startLiveStream}>▶️ Start Stream</button>
+				)}
+			</div>
+		</div>
+	);
 }
