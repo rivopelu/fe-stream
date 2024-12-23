@@ -7,8 +7,10 @@ import './server/server'
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1920,
+    height: 1080,
+    minWidth: 1920,
+    minHeight: 1080,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),

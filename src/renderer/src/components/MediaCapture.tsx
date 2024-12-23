@@ -7,46 +7,29 @@ export function MediaCapture() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
 
-  /**
-   * 📡 Start Live Stream
-   */
   const startLiveStream = async () => {
     try {
-      // 1. Access Screen and Audio
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { width: 1920, height: 1080, frameRate: 30 },
         audio: true
       })
-      // const stream = await navigator.mediaDevices.getDisplayMedia({
-      // 	video: {
-      // 		width: { ideal: 1920 },
-      // 		height: { ideal: 1080 },
-      // 		frameRate: { ideal: 30 },
-      // 	},
-      // 	audio: true,
-      // });
 
-      // 2. Display Stream in Video Element
       if (videoRef.current) {
         videoRef.current.srcObject = stream
       }
 
-      // 3. Initialize MediaRecorder
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm; codecs=vp8' // VP8 codec for WebM format
-        // mimeType: 'video/mp4; codecs=avc1.42E01E'  // H.264 codec for MP4 format
+        mimeType: 'video/webm; codecs=vp8'
       })
 
-      // 4. Store MediaRecorder in Ref
       mediaRecorderRef.current = mediaRecorder
 
-      // 5. Handle Data Available Event
       mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0) {
           try {
             const blob = event.data
             console.log('Chunk Blob size:', blob.size)
-            await sendToServer(blob) // Send chunk to the server
+            // await sendToServer(blob)
           } catch (err) {
             console.error('Failed to send chunk:', err)
             setErrorMessage('Failed to send data to server.')
@@ -54,14 +37,12 @@ export function MediaCapture() {
         }
       }
 
-      // 6. Handle Errors
       mediaRecorder.onerror = (event) => {
         console.error('MediaRecorder error:', event.error)
         setErrorMessage('MediaRecorder encountered an error.')
       }
 
-      // 7. Start Recording
-      mediaRecorder.start(1000) // Record in 1-second chunks
+      mediaRecorder.start(1000)
       setIsCameraActive(true)
 
       console.log('MediaRecorder started')
@@ -71,9 +52,6 @@ export function MediaCapture() {
     }
   }
 
-  /**
-   * 📤 Send Chunks to Server
-   */
   const sendToServer = async (blob: Blob) => {
     try {
       const formData = new FormData()
@@ -95,9 +73,6 @@ export function MediaCapture() {
     }
   }
 
-  /**
-   * 🛑 Stop Live Stream
-   */
   const stopCamera = () => {
     try {
       if (mediaRecorderRef.current) {
@@ -122,10 +97,9 @@ export function MediaCapture() {
   }
 
   return (
-    <div>
-      <h1>🎥 Media Capture</h1>
+    <div className=" h-full w-full">
       {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
-      <video ref={videoRef} autoPlay muted style={{ width: '600px', border: '1px solid black' }} />
+      <video ref={videoRef} autoPlay muted style={{ width: '100%', border: '1px solid black' }} />
       <div>
         {isCameraActive ? (
           <button onClick={stopCamera}>🛑 Stop Stream</button>
