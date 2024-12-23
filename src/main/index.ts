@@ -2,7 +2,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow, desktopCapturer, ipcMain, session, shell } from 'electron'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
-// import './server'
+import './server'
 
 function createWindow(): void {
   // Create the browser window.
@@ -62,39 +62,8 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
   ipcMain.on('start-stream', () => {
-    // ffmpegProcess = spawn('ffmpeg', [
-    //   '-y',
-    //   '-i',
-    //   '-',
-    //   '-c:v',
-    //   'libx264',
-    //   '-preset',
-    //   'veryfast',
-    //   '-tune',
-    //   'zerolatency',
-    //   '-b:v',
-    //   '3000k',
-    //   '-f',
-    //   'flv',
-    //   streamData.rtmpUrl // Stream URL from renderer
-    // ])
-
-    // ffmpegProcess.stderr.on('data', (data) => {
-    //   console.error(`FFmpeg stderr: ${data}`)
-    // })
-
-    // ffmpegProcess.on('close', (code) => {
-    //   console.log(`FFmpeg process exited with code ${code}`)
-    // })
     console.log('HELLO')
   })
-
-  // ipcMain.on('stop-stream', () => {
-  //   if (ffmpegProcess) {
-  //     ffmpegProcess.stdin.end()
-  //     ffmpegProcess.kill('SIGINT')
-  //   }
-  // })
 
   createWindow()
 
