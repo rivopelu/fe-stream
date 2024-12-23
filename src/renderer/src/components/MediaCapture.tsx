@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { useRef, useState } from 'react'
 
 export function MediaCapture() {
@@ -78,7 +79,7 @@ export function MediaCapture() {
       const formData = new FormData()
       formData.append('video', blob, 'chunk.webm')
 
-      const response = await fetch('http://localhost:3000/upload', {
+      const response = await fetch('http://localhost:9987/stream', {
         method: 'POST',
         body: formData
       })
@@ -110,6 +111,10 @@ export function MediaCapture() {
       }
 
       setIsCameraActive(false)
+
+      axios.patch('http://localhost:9987/stop').then(() => {
+        alert('OKE')
+      })
     } catch (error) {
       console.error('Error stopping live stream:', error)
       setErrorMessage('Failed to stop the live stream.')

@@ -6,7 +6,7 @@ function App(): JSX.Element {
   const ipcHandle = (): void => window.electron.ipcRenderer.send('ping')
 
   useEffect(() => {
-    axios.get('http://localhost:3000').then((res) => console.log(res))
+    axios.get('http://localhost:9987').then((res) => console.log(res))
   }, [])
 
   return (

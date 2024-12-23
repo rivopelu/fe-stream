@@ -1,16 +1,16 @@
 import bodyParser from 'body-parser'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import express, { Express } from 'express'
 import multer from 'multer'
-import express, { Express, Request, Response } from 'express'
-import { STREAM_KEY, STREAM_SERVER } from '../renderer/src/ENV'
 import { PassThrough } from 'stream'
+import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg'
+import ffmpeg from 'fluent-ffmpeg'
 dotenv.config()
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
-const ffmpeg = require('fluent-ffmpeg')
-ffmpeg.setFfmpegPath(ffmpegPath)
+
 const app: Express = express()
-const port = process.env.PORT || 3000
+const port = process.env.PORT || 9987
+ffmpeg.setFfmpegPath(ffmpegPath)
 
 app.use(express.json())
 app.use(cors())
@@ -19,71 +19,72 @@ const upload = multer({
   storage: multer.memoryStorage()
 })
 
-const rtmpUrl = `${STREAM_SERVER}/${STREAM_KEY}`
+const videoStream = new PassThrough()
+let isStreaming = false
 
-app.get('/', (_: Request, res: Response) => {
-  const command = ffmpeg('./video.mp4', { option: 'value' })
-
-  command
+function startStreaming() {
+  if (isStreaming) return
+  isStreaming = true
+  ffmpeg(videoStream)
+    .inputFormat('webm') // Match frontend mimeType
+    .videoCodec('libx264')
+    .audioCodec('aac')
     .outputOptions([
-      '-r 30',
-      '-c:v libx264',
       '-preset veryfast',
       '-b:v 2500k',
-      '-maxrate 2500k',
+      '-maxrate 4500k',
       '-bufsize 9000k',
+      '-pix_fmt yuv420p',
+      '-r 30',
+      '-g 60',
       '-c:a aac',
       '-b:a 128k',
       '-ar 44100',
       '-f flv'
     ])
-    .inputOptions('-stream_loop -1')
     .on('start', (commandLine) => {
-      console.log('FFmpeg started with command:', commandLine)
-    })
-    .on('progress', (progress) => {
-      console.log(progress)
-      console.log(`Processing: ${progress.frames} frames`)
+      console.log('FFmpeg started:', commandLine)
     })
     .on('error', (err) => {
-      console.error('Error:-', err)
+      console.error('FFmpeg error:', err)
+      isStreaming = false
     })
     .on('end', () => {
-      console.log('Stream ended')
+      console.log('Streaming ended')
+      isStreaming = false
     })
-    .save(rtmpUrl)
+    .save('rtmp://a.rtmp.youtube.com/live2/rkt4-pju7-z1r9-t6w6-3h2e')
+}
 
-  res.send({ test: 'testing' })
+app.post('/stream', upload.single('video'), (req: any, res: any) => {
+  if (!req.file || !req.file.buffer) {
+    console.error('No video data received.')
+    return res.status(400).send('No video data received.')
+  }
+
+  try {
+    if (!isStreaming) {
+      startStreaming()
+    }
+
+    videoStream.write(req.file.buffer)
+    res.status(200).send('Chunk received')
+  } catch (error) {
+    console.error('Error processing chunk:', error)
+    res.status(500).send('Error processing chunk')
+  }
 })
 
-app.post('/stream', upload.single('video'), (req: any, res) => {
-  const videoStream = new PassThrough()
-  videoStream.end(req.file.buffer) // Buffer data dari frontend
-  console.log(videoStream)
-
-  // Kirim video ke RTMP server
-  ffmpeg(videoStream)
-    .inputOptions([
-      '-re',
-      '-f webm', // Format input
-      '-i pipe:0' // Input dari pipe
-    ])
-    .outputOptions([
-      '-c:v libx264',
-      '-preset veryfast',
-      '-tune zerolatency',
-      '-c:a aac',
-      '-ar 44100',
-      '-b:a 128k',
-      '-f flv'
-    ])
-    .on('start', () => console.log('Streaming started...'))
-    .on('error', (err) => console.error('Streaming error:', err))
-    .on('end', () => console.log('Streaming ended.'))
-    .output(rtmpUrl)
-    .run()
-
-  res.sendStatus(200)
+app.patch('/stop', (_, res) => {
+  try {
+    videoStream.end()
+    isStreaming = false
+    console.log('Streaming stopped')
+    res.status(200).send('Streaming stopped')
+  } catch (error) {
+    console.error('Error stopping stream:', error)
+    res.status(500).send('Error stopping stream')
+  }
 })
 
 app.listen(port, () => {
