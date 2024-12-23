@@ -2,7 +2,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow, desktopCapturer, ipcMain, session, shell } from 'electron'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
-import './server'
+import './server/server'
 
 function createWindow(): void {
   // Create the browser window.
@@ -15,7 +15,7 @@ function createWindow(): void {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      contextIsolation: true, // harus true untuk security
+      contextIsolation: true,
       webviewTag: true,
       webSecurity: true
     }
