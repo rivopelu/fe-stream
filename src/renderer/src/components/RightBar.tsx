@@ -4,7 +4,7 @@ export function RightBar() {
   return (
     <div
       className="bg-slate-900 border-l border-slate-700 h-screen"
-      style={{ width: STYLE_VARIABLE.SIDEBAR_WIDTH }}
+      style={{ width: STYLE_VARIABLE.SIZE.SIDEBAR_WIDTH }}
     >
       HELLO
     </div>

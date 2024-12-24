@@ -2,15 +2,15 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow, desktopCapturer, ipcMain, session, shell } from 'electron'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
-import './server/server'
+// import './server/server'
 
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 1920,
-    height: 1080,
-    minWidth: 1920,
-    minHeight: 1080,
+    width: 600,
+    height: 600,
+    minWidth: 600,
+    minHeight: 600,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
