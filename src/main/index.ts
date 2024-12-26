@@ -11,10 +11,10 @@ ffmpeg.setFfmpegPath(ffmpegPath)
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 600,
-    height: 600,
-    minWidth: 600,
-    minHeight: 600,
+    width: 1240,
+    height: 720,
+    minWidth: 1240,
+    minHeight: 720,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
