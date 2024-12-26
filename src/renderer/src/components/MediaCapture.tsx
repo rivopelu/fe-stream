@@ -1,5 +1,10 @@
-import axios from 'axios'
 import { useEffect, useRef, useState } from 'react'
+
+const ipcHandle = async (data: Blob) => {
+  const arrayBuffer = await data.arrayBuffer() // Konversi Blob ke ArrayBuffer
+  const uint8Array = new Uint8Array(arrayBuffer) // Konversi ke Uint8Array
+  window.electron.ipcRenderer.send('start-stream', uint8Array)
+}
 
 export function MediaCapture() {
   const [errorMessage, setErrorMessage] = useState<string>('')
@@ -30,7 +35,7 @@ export function MediaCapture() {
 
   useEffect(() => {
     const cleanup = monitorNetwork()
-    return cleanup // Hapus listener atau interval saat komponen di-unmount
+    return cleanup // Hapus listener saat komponen di-unmount
   }, [])
 
   const startLiveStream = async () => {
@@ -40,40 +45,13 @@ export function MediaCapture() {
         audio: true // Menangkap audio dari layar
       })
 
-      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const audioElement = new Audio('https://webaudioapi.com/samples/audio-tag/chrono.mp3') // Path ke file audio Anda
-      audioElement.loop = true // Atur supaya audio di-loop
-
-      // Menunggu agar audio siap diputar
-      await audioElement.play()
-
-      // Membuat AudioContext untuk menangani audio
-      const audioContext = new AudioContext()
-
-      // Menghubungkan audioElement ke AudioContext
-      const audioSourceNode = audioContext.createMediaElementSource(audioElement)
-
-      // Membuat destination untuk mengambil audio stream
-      const audioDestination = audioContext.createMediaStreamDestination()
-
-      // Menghubungkan sourceNode ke destination
-      audioSourceNode.connect(audioDestination)
-
-      // Ambil audio track dari audio stream
-      const audioFromAssetStream = audioDestination.stream
-      // Gabungkan video layar dan audio mikrofon
-      const combinedStream = new MediaStream([
-        ...displayStream.getVideoTracks(),
-        ...audioStream.getAudioTracks()
-      ])
-
       if (videoRef.current) {
-        videoRef.current.srcObject = combinedStream
+        videoRef.current.srcObject = displayStream
       }
 
-      // Rekam audio + video
-      const mediaRecorder = new MediaRecorder(combinedStream, {
-        mimeType: 'video/webm; codecs=vp8,opus' // Pastikan mendukung audio
+      // Rekam video dan audio
+      const mediaRecorder = new MediaRecorder(displayStream, {
+        mimeType: 'video/webm; codecs=vp8,opus'
       })
 
       mediaRecorderRef.current = mediaRecorder
@@ -83,10 +61,10 @@ export function MediaCapture() {
           try {
             const blob = event.data
             console.log('Chunk Blob size:', blob.size)
-            // await sendToServer(blob)
+            await sendToServer(blob) // Kirim data ke main process
           } catch (err) {
             console.error('Failed to send chunk:', err)
-            setErrorMessage('Failed to send data to server.')
+            setErrorMessage('Failed to send data to main process.')
           }
         }
       }
@@ -108,24 +86,10 @@ export function MediaCapture() {
 
   const sendToServer = async (blob: Blob) => {
     try {
-      const formData = new FormData()
-      formData.append('video', blob, 'chunk.webm')
-
-      const response = await fetch('http://localhost:3000/upload', {
-        method: 'POST',
-        body: formData
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status: ${response.status}`)
-      } else {
-        setErrorMessage('')
-      }
-
-      console.log('Chunk sent successfully')
+      await ipcHandle(blob) // Kirim data ke Electron Main Process
     } catch (error) {
-      console.error('Error sending chunk to server:', error)
-      setErrorMessage('Failed to send data to server.')
+      console.error('Error sending chunk to main process:', error)
+      setErrorMessage('Failed to send data to main process.')
     }
   }
 
@@ -142,10 +106,6 @@ export function MediaCapture() {
       }
 
       setIsCameraActive(false)
-
-      axios.patch('http://localhost:9987/stop').then(() => {
-        alert('OKE')
-      })
     } catch (error) {
       console.error('Error stopping live stream:', error)
       setErrorMessage('Failed to stop the live stream.')
@@ -153,7 +113,7 @@ export function MediaCapture() {
   }
 
   return (
-    <div className=" h-full w-full">
+    <div className="h-full w-full">
       {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
       <div>
         <p>Network Status: {networkStatus}</p>
@@ -165,7 +125,6 @@ export function MediaCapture() {
         muted
         style={{ width: '100%', border: '1px solid black' }}
       />
-
       <div>
         {isCameraActive ? (
           <button onClick={stopCamera}>🛑 Stop Stream</button>
