@@ -1,5 +1,10 @@
-import axios from 'axios'
 import { useEffect, useRef, useState } from 'react'
+
+const ipcHandle = async (data: Blob) => {
+  const arrayBuffer = await data.arrayBuffer() // Konversi Blob ke ArrayBuffer
+  const uint8Array = new Uint8Array(arrayBuffer) // Konversi ke Uint8Array
+  window.electron.ipcRenderer.send('start-stream', uint8Array)
+}
 
 export function MediaCapture() {
   const [errorMessage, setErrorMessage] = useState<string>('')
@@ -30,7 +35,7 @@ export function MediaCapture() {
 
   useEffect(() => {
     const cleanup = monitorNetwork()
-    return cleanup // Hapus listener atau interval saat komponen di-unmount
+    return cleanup // Hapus listener saat komponen di-unmount
   }, [])
 
   const startLiveStream = async () => {
@@ -59,9 +64,6 @@ export function MediaCapture() {
       // Menghubungkan sourceNode ke destination
       audioSourceNode.connect(audioDestination)
 
-      // Ambil audio track dari audio stream
-      const audioFromAssetStream = audioDestination.stream
-      // Gabungkan video layar dan audio mikrofon
       const combinedStream = new MediaStream([
         ...displayStream.getVideoTracks(),
         ...audioStream.getAudioTracks()
@@ -83,7 +85,7 @@ export function MediaCapture() {
           try {
             const blob = event.data
             console.log('Chunk Blob size:', blob.size)
-            // await sendToServer(blob)
+            await sendToServer(blob)
           } catch (err) {
             console.error('Failed to send chunk:', err)
             setErrorMessage('Failed to send data to server.')
@@ -108,24 +110,10 @@ export function MediaCapture() {
 
   const sendToServer = async (blob: Blob) => {
     try {
-      const formData = new FormData()
-      formData.append('video', blob, 'chunk.webm')
-
-      const response = await fetch('http://localhost:3000/upload', {
-        method: 'POST',
-        body: formData
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status: ${response.status}`)
-      } else {
-        setErrorMessage('')
-      }
-
-      console.log('Chunk sent successfully')
+      await ipcHandle(blob) // Kirim data ke Electron Main Process
     } catch (error) {
-      console.error('Error sending chunk to server:', error)
-      setErrorMessage('Failed to send data to server.')
+      console.error('Error sending chunk to main process:', error)
+      setErrorMessage('Failed to send data to main process.')
     }
   }
 
@@ -142,10 +130,6 @@ export function MediaCapture() {
       }
 
       setIsCameraActive(false)
-
-      axios.patch('http://localhost:9987/stop').then(() => {
-        alert('OKE')
-      })
     } catch (error) {
       console.error('Error stopping live stream:', error)
       setErrorMessage('Failed to stop the live stream.')
@@ -153,7 +137,7 @@ export function MediaCapture() {
   }
 
   return (
-    <div className=" h-full w-full">
+    <div className="h-full w-full">
       {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
       <div>
         <p>Network Status: {networkStatus}</p>
@@ -165,7 +149,6 @@ export function MediaCapture() {
         muted
         style={{ width: '100%', border: '1px solid black' }}
       />
-
       <div>
         {isCameraActive ? (
           <button onClick={stopCamera}>🛑 Stop Stream</button>
