@@ -2,15 +2,14 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow, desktopCapturer, ipcMain, session, shell } from 'electron'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
-import './server/server'
+import { streamLogic } from './server/controllers/stream-controller'
 
 function createWindow(): void {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 1920,
-    height: 1080,
-    minWidth: 1920,
-    minHeight: 1080,
+    width: 1240,
+    height: 720,
+    minWidth: 1240,
+    minHeight: 720,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -52,23 +51,16 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // let ffmpegProcess: any = null
-
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-  ipcMain.on('start-stream', () => {
-    console.log('HELLO')
-  })
+  ipcMain.on('ping', (_, title) => console.log(title))
 
   createWindow()
-
+  streamLogic(ipcMain)
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
