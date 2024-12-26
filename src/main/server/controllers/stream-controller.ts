@@ -1,55 +1,25 @@
 import { PassThrough } from 'stream'
-import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg'
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
 import ffmpeg from 'fluent-ffmpeg'
-export class StreamController {
-  private isStreaming = false
-  private videoStream = new PassThrough()
+ffmpeg.setFfmpegPath(ffmpegPath)
 
-  public postSream(req: any, res: any) {
-    if (!req.file || !req.file.buffer) {
-      console.error('No video data received.')
-      return res.status(400).send('No video data received.')
-    }
+export function streamLogic(ipcMain: any) {
+  const videoStream = new PassThrough() // Stream untuk data video/audio
+  let isStreaming = false
+  function startStreaming() {
+    isStreaming = true
 
-    try {
-      if (!this.isStreaming) {
-        this.startStream()
-      }
-
-      this.videoStream.write(req.file.buffer)
-      res.status(200).send('Chunk received')
-    } catch (error) {
-      console.error('Error processing chunk:', error)
-      res.status(500).send('Error processing chunk')
-    }
-  }
-
-  public stopStream(_, res: any) {
-    try {
-      this.videoStream.end()
-      this.isStreaming = false
-      console.log('Streaming stopped')
-      res.status(200).send('Streaming stopped')
-    } catch (error) {
-      console.error('Error stopping stream:', error)
-      res.status(500).send('Error stopping stream')
-    }
-  }
-
-  private startStream() {
-    if (this.isStreaming) return
-    this.isStreaming = true
-    ffmpeg(this.videoStream)
+    ffmpeg(videoStream)
       .inputFormat('webm')
       .videoCodec('libx264')
       .audioCodec('aac')
       .outputOptions([
-        '-preset veryfast',
-        '-b:v 2500k',
-        '-maxrate 4500k',
-        '-bufsize 9000k',
+        '-preset ultrafast',
+        '-b:v 1000k',
+        '-maxrate 1300k',
+        '-bufsize 500k',
         '-pix_fmt yuv420p',
-        '-r 30',
+        '-r 20',
         '-g 60',
         '-c:a aac',
         '-b:a 128k',
@@ -59,14 +29,43 @@ export class StreamController {
       .on('start', (commandLine) => {
         console.log('FFmpeg started:', commandLine)
       })
+      .on('progress', (progress) => {
+        console.log(progress)
+      })
       .on('error', (err) => {
-        console.error('FFmpeg error:', err)
-        this.isStreaming = false
+        console.error('FFmpeg error:', err.message)
+        isStreaming = false
       })
       .on('end', () => {
         console.log('Streaming ended')
-        this.isStreaming = false
+        isStreaming = false
       })
-      .save('rtmp://a.rtmp.youtube.com/live2/rkt4-pju7-z1r9-t6w6-3h2e')
+      .save('rtmp://127.0.0.1/live/S1C7Eo_rye')
   }
+
+  // Handle event 'start-stream'
+  // Tangani event IPC dari renderer process
+  ipcMain.on('start-stream', (_, chunk) => {
+    try {
+      if (!isStreaming) {
+        console.log('Starting streaming...')
+        startStreaming()
+      }
+
+      const buffer = Buffer.from(chunk) // Pastikan data diubah ke buffer
+      videoStream.write(buffer) // Tulis data ke stream
+    } catch (error) {
+      console.error('Error handling stream chunk:', error)
+    }
+  })
+
+  ipcMain.on('stop-stream', () => {
+    try {
+      console.log('Stopping streaming...')
+      videoStream.end() // Akhiri aliran data
+      isStreaming = false
+    } catch (error) {
+      console.error('Error stopping stream:', error)
+    }
+  })
 }
