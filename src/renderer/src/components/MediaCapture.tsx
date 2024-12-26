@@ -45,13 +45,37 @@ export function MediaCapture() {
         audio: true // Menangkap audio dari layar
       })
 
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const audioElement = new Audio('https://webaudioapi.com/samples/audio-tag/chrono.mp3') // Path ke file audio Anda
+      audioElement.loop = true // Atur supaya audio di-loop
+
+      // Menunggu agar audio siap diputar
+      await audioElement.play()
+
+      // Membuat AudioContext untuk menangani audio
+      const audioContext = new AudioContext()
+
+      // Menghubungkan audioElement ke AudioContext
+      const audioSourceNode = audioContext.createMediaElementSource(audioElement)
+
+      // Membuat destination untuk mengambil audio stream
+      const audioDestination = audioContext.createMediaStreamDestination()
+
+      // Menghubungkan sourceNode ke destination
+      audioSourceNode.connect(audioDestination)
+
+      const combinedStream = new MediaStream([
+        ...displayStream.getVideoTracks(),
+        ...audioStream.getAudioTracks()
+      ])
+
       if (videoRef.current) {
-        videoRef.current.srcObject = displayStream
+        videoRef.current.srcObject = combinedStream
       }
 
-      // Rekam video dan audio
-      const mediaRecorder = new MediaRecorder(displayStream, {
-        mimeType: 'video/webm; codecs=vp8,opus'
+      // Rekam audio + video
+      const mediaRecorder = new MediaRecorder(combinedStream, {
+        mimeType: 'video/webm; codecs=vp8,opus' // Pastikan mendukung audio
       })
 
       mediaRecorderRef.current = mediaRecorder
@@ -61,10 +85,10 @@ export function MediaCapture() {
           try {
             const blob = event.data
             console.log('Chunk Blob size:', blob.size)
-            await sendToServer(blob) // Kirim data ke main process
+            await sendToServer(blob)
           } catch (err) {
             console.error('Failed to send chunk:', err)
-            setErrorMessage('Failed to send data to main process.')
+            setErrorMessage('Failed to send data to server.')
           }
         }
       }
